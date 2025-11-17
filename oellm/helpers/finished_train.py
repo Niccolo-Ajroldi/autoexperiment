@@ -1,24 +1,26 @@
 #!/usr/bin/env python3
 """
-finished_train.py — Return 1 if training is finished, else 0.
+Finds latest log starting with JOB_NAME in LOG_DIR.
+Checks err and out files to asses if job is finished, timed out, or errored.
+We use it to determine whether to reschedule a training job.
 
 Usage:
     finished_train.py LOG_DIR JOB_NAME
 
-Finds latest log starting with job_name, looks for termination string.
+Returns:
+    1 — training finished or irrecoverably failed (do not reschedule)
+    0 — training not finished or timed out (reschedule)
 """
+
 
 import sys, os, re
 
+
 FINISHED_PATTERNS = [
     r'after training is done',
-    r'KeyError', # mark as finished even if crash occurs after final save TODO: fix
 ]
 TIMEOUT_PATTERNS = [
     r'DUE TO TIME LIMIT',
-    r'(Bus error: nonexistent physical address)',
-    r'AssertionError: OptimizerParamScheduler: class input value', # patch TODO: remove
-    r'Communication connection failure', # patch, TODO: remove
 ]
 ERROR_PATTERNS = [
     r'Traceback \(most recent call last\):',
@@ -28,6 +30,9 @@ ERROR_PATTERNS = [
     r'Exited with exit code 1',
     r'ChildFailedError',
     r'srun: error',
+    r'Communication connection failure',
+    r'AssertionError'
+    r'(Bus error: nonexistent physical address)',
 ]
 
 
@@ -92,6 +97,7 @@ def main():
         print(1)  # died -> no reschedule
     else:
         print(0)  # reschedule
+
 
 if __name__ == "__main__":
     main()

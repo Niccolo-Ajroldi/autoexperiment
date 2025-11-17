@@ -1,0 +1,17 @@
+[tool.ruff]
+line-length = 80
+indent-width = 4
+
+[tool.ruff.format]
+quote-style = "single"
+
+[tool.ruff.lint]
+extend-select = [
+    "BLE",      # disallow catch-all exceptions
+    "F",        # Pyflakes rules
+    "FA",       # Enforce from __future__ import annotations
+    "I",        # Isort rules
+    "ICN",      # Use common import conventions
+    "PLE",      # Pylint Errors
+    "TID",      # Some good import practices
+]
