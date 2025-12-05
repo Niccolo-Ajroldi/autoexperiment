@@ -20,7 +20,7 @@ autoexp:
     scripts: "{out_folder}/sbatch"
 
     # Templated sbatch.
-    template: "/leonardo/home/userexternal/najroldi/oellm/dev/autoexperiment/scripts/dense_scaling/train_02.sbatch"
+    template: "/leonardo/home/userexternal/najroldi/oellm/dev/autoexperiment/scripts/dense_scaling/train.sbatch"
 
     # Destination for sbatch script and command to execute.
     sbatch_script: "{scripts}/{name}.sbatch"
