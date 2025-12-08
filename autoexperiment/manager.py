@@ -53,7 +53,8 @@ def manage_jobs_forever(jobs, max_jobs:int=None, verbose=0):
     Manage a list of jobs forever, relaunching them if they are frozen or not running anymore.
     """
     limits_manager = JobLimitsManager(max_jobs) if max_jobs is not None else None
-    loop = asyncio.get_event_loop()
+    loop = asyncio.new_event_loop()
+    asyncio.set_event_loop(loop)
     loop.run_until_complete(asyncio.gather(*[
         manage_job(job, limits_manager, verbose=verbose) for job in jobs
     ]))
