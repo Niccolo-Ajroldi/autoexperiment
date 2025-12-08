@@ -42,7 +42,7 @@ slurm:
     account: "project_462000963"
     partition: small-g
 
-    cluster_setup_script: "{autoexp.cluster}/setup_lumi_torchrun.sh"
+    cluster_setup_script: "{autoexp.cluster}/setup_lumi.sh"
 
 ###############################################################
 # MEGATRON ARGS.
