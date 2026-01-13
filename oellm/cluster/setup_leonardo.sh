@@ -1,14 +1,14 @@
 #!/bin/bash
 
 # Container image
-CONTAINER="/leonardo_work/AIFAC_L01_028/container_images/container_images/pytorch_24.09-py3_leonardo.sif"
+CONTAINER="/leonardo_work/OELLM_prod2026/container_images/pytorch_24.09-py3_leonardo.sif"
 
 # Leonardo project directory
-PROJECT_DIR="/leonardo_work/AIFAC_L01_028"
-PROJECT_FAST_DIR="/leonardo_scratch/fast/AIFAC_L01_028"
+PROJECT_DIR="/leonardo_work/OELLM_prod2026"
+PROJECT_FAST_DIR="/leonardo_scratch/fast/OELLM_prod2026"
 
 # Path to Megatron-LM repo
-MEGATRON_PATH="/leonardo_work/AIFAC_L01_028/najroldi/Megatron-LM"
+MEGATRON_PATH="/leonardo_work/OELLM_prod2026/users/najroldi/code/Megatron-LM"
 
 # MEGATRON CACHE
 MEGATRON_CACHE_BASE="/leonardo_scratch/large/userexternal"
