@@ -1,5 +1,5 @@
 #
-# 50M scaling experiment on Leonardo.
+# 600M scaling experiment on Leonardo.
 #
 
 ###############################################################
@@ -20,7 +20,7 @@ autoexp:
     scripts: "{out_folder}/sbatch"
 
     # Templated sbatch.
-    template: "/leonardo/home/userexternal/najroldi/oellm/dev/autoexperiment/scripts/dense/50M_leo/train.sbatch"
+    template: "/leonardo/home/userexternal/najroldi/oellm/dev/autoexperiment/scripts/dense/leonardo/train.sbatch"
 
     # Destination for sbatch script and command to execute.
     sbatch_script: "{scripts}/{name}.sbatch"
@@ -52,7 +52,7 @@ args:
 
     # wandb name
     wandb_exp_name: "{autoexp.name}"
-    wandb_project: oellm-train
+    wandb_project: dense_scaling
 
     # DATA
     data_path: [
@@ -70,22 +70,22 @@ args:
     num_workers: 8
     split: '99,1,0'
 
-    # MODEL
-    num_layers: 12
-    hidden_size: 384
-    ffn_hidden_size: 1536
-    num_attention_heads: 6
+    # MODEL: 600M
+    num_layers: 22
+    hidden_size: 1280
+    ffn_hidden_size: 5120
+    num_attention_heads: 20
+    num_query_groups: "{args.num_attention_heads}" # no gqa when NUM_QUERY_GROUPS==NUM_ATTENTION_HEADS TODO: check
+    group_query_attentions: False
     init_method_std: 0.02
     position_embedding_type: "rope"
     rotary_base: 10000
     rotary_percent: 1.0
-    group_query_attentions: False
-    num_query_groups: 6 # no gqa when NUM_QUERY_GROUPS==NUM_ATTENTION_HEADS TODO: check
     attention_dropout: 0.0
     hidden_dropout: 0.0
     normalization: RMSNorm
     norm_epsilon: 1.e-5 # rmsnorm epsilon
-    qk_layernorm: True # potentially enable qk-norm
+    qk_layernorm: True # enable qk-norm
     bf16: True
     swiglu: True
     untie_embeddings_and_output_weights: False
@@ -104,43 +104,39 @@ args:
     distributed_backend: nccl
     distributed_timeout_minutes: 10
 
-    # DISTRIBUTED OPTIM: False, since (1) small model, (2) troubles with resuming, TODO: fix.
-    use_distributed_optimizer: False
+    # DISTRIBUTED OPTIM
+    use_distributed_optimizer: True
 
     # OPTIMIZER
     optimizer: adam
     adam_beta1: 0.9
-    adam_beta2: 0.99
+    adam_beta2: 0.95 # TODO: Adpat it to the model size!
     adam_eps: 1.e-8
     clip_grad: 1.0
     weight_decay: 0.1
 
     # SCHEDULER
-    min_lr: 0.0
+    min_lr: 1.e-5
     lr_decay_style: WSD
     lr_wsd_decay_style: linear
-    lr_warmup_iters: 1000 # For now we fix it to 1k
+    lr_warmup_iters: 2000
 
     # PROFILE
     profile: False
     use_pytorch_profiler: False
-    profile_ranks: [0]
-    profile_step_start: 5
-    profile_step_end: 12
 
     # EVALS
     eval_interval: 5000
-    eval_iters: 100
+    eval_iters: 100 # Megatron default
 
     # LOGGING
-    log_interval: 10
+    log_interval: 1
     log_progress: True
     log_throughput: True
-    tensorboard_queue_size: 5
 
     # Set CHECKPOINT_FORMAT
     ckpt_format: "torch" # "torch_dist" is bugged, TODO: fix
-    save_interval: 500
+    save_interval: 5000
 
 
 ###############################################################
@@ -152,14 +148,11 @@ args:
 
 experiments:
 
-    # A base name common to all phases.
-    base_name: "50M_lr{args.lr}_gbsz{args.global_batch_size}"
-
     # Batch size per gpu.
     args.micro_batch_size: 16
 
     # Learning rate sweep.
-    args.lr: [5.e-4, 1.e-3, 2.e-3, 4.e-3, 8.e-3]
+    args.lr: [0.0001, 0.0003, 0.0009, 0.0027]
 
     # Sweep over global batch sizes and corresponding nodes/gpus.
     sweep:
@@ -173,41 +166,62 @@ experiments:
             slurm.gpus_per_node: 2
             slurm.nodes: 1
 
-    # Train iters from tokens
+    # Train iters computed from tokens.
     args.train_iters: "expr(({tokens} + {args.seq_length} * {args.global_batch_size} - 1) // ({args.seq_length} * {args.global_batch_size}))"
 
-    # Stable and cooldowns
-    phase:
-        - stable:
-            autoexp.name: "{base_name}_stable"
-            tokens: 50_000_000_000
-            args.lr_wsd_decay_iters: 0
+    # Cooldown: 20% of train iters.
+    decay_fraction: 0.2
+    args.lr_wsd_decay_iters: "expr(int({args.train_iters} * {decay_fraction}))"
 
-        - decay:
-            autoexp.name: "{base_name}_decay{args.train_iters}"
+    # A base name common to all phases.
+    base_name: "600M_lr{args.lr}_gbsz{args.global_batch_size}"
+
+    # Phase-specific name.
+    autoexp.name: "{base_name}_{label}"
+
+    # A long 300BT run and intermediate decays.
+    phase:
+
+        - longest:
+            label: 300B
+            tokens: 300_000_000_000
+
+        - decays:
             scale:
-            - 6B:
-                tokens: 6_000_000_000
-            - 12B:
-                tokens: 12_000_000_000
-            - 30B:
-                tokens: 30_000_000_000
-            - 50B:
-                tokens: 50_000_000_000
+                - 6B:
+                    label: 6B
+                    tokens: 6_000_000_000
+                - 12B:
+                    label: 12B
+                    tokens: 12_000_000_000
+                - 20B:
+                    label: 20B
+                    tokens: 20_000_000_000
+                - 30B:
+                    label: 30B
+                    tokens: 30_000_000_000
+                - 50B:
+                    label: 50B
+                    tokens: 50_000_000_000
+                - 80B:
+                    label: 80B
+                    tokens: 80_000_000_000
+                - 120B:
+                    label: 120B
+                    tokens: 120_000_000_000
+                - 200B:
+                    label: 200B
+                    tokens: 200_000_000_000
 
             # Cooldown 20%, start cooldown at 80% of train_iters.
             decay_fraction: 0.2
             start_iter: "expr(int({args.train_iters} * (1 - {decay_fraction})))"
+            # Round down to a multiple of save_interval.
+            start_iter_round: "expr(int(({start_iter} + {args.save_interval} // 2) // {args.save_interval} * {args.save_interval}))"
 
-            # Round down to the previous number to a multiple of 500 (save_interval).
-            start_iter_round: "expr(int(({start_iter} + 250) // 500 * 500))"
-
-            # Decay iterations
-            args.lr_wsd_decay_iters: "expr(int({args.train_iters} * {decay_fraction}))"
-
-            # Start decay when the stable run has reached start_iter.
+            # Start decay when the long run has reached start_iter.
             autoexp.start_condition_cmd: "{autoexp.helpers}/pending_cooldown.py \
-                {autoexp.ckpts} {base_name}_stable {autoexp.name} {start_iter_round}"
+                {autoexp.ckpts} {base_name}_300B {autoexp.name} {start_iter_round}"
 
             # Override the LR Scheduler in the decay phase.
             args.override_opt_param_scheduler: True
