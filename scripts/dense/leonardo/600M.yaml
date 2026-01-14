@@ -13,7 +13,7 @@ autoexp:
     helpers: "{oellm_folder}/helpers"
     cluster: "{oellm_folder}/cluster"
 
-    # Output folder. For this example we write in this folder.
+    # Output folder.
     out_folder: "/leonardo_work/OELLM_prod2026/users/najroldi/exp"
     logs: "{out_folder}/logs"
     ckpts: "{out_folder}/ckpts"

@@ -67,6 +67,9 @@ TENSORBOARD_DIR="${CHECKPOINT_PATH}/tensorboard"
 WANDB_DIR="${CHECKPOINT_PATH}/wandb"
 mkdir -p "{out_dir}" "{ckpt_dir}" "$CHECKPOINT_PATH" "$TENSORBOARD_DIR" "$WANDB_DIR"
 
+# SET WANDB ENTITY to project namespace
+export WANDB_ENTITY="openeurollm-project"
+
 ######################################################################
 # MEGATRON ARGUMENTS
 ######################################################################
