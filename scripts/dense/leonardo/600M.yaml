@@ -149,7 +149,7 @@ args:
 experiments:
 
     # Batch size per gpu.
-    args.micro_batch_size: 16
+    args.micro_batch_size: 4
 
     # Learning rate sweep.
     args.lr: [0.0001, 0.0003, 0.0009, 0.0027]
@@ -157,14 +157,9 @@ experiments:
     # Sweep over global batch sizes and corresponding nodes/gpus.
     sweep:
         - full_node:
-            args.global_batch_size: [64, 128, 256, 512]
+            args.global_batch_size: [32, 64, 128, 256, 512]
             slurm.gpus_per_node: 4
             slurm.nodes: "expr({args.global_batch_size} // ({args.micro_batch_size} * {slurm.gpus_per_node}))"
-
-        - half_node:
-            args.global_batch_size: 32
-            slurm.gpus_per_node: 2
-            slurm.nodes: 1
 
     # Train iters computed from tokens.
     args.train_iters: "expr(({tokens} + {args.seq_length} * {args.global_batch_size} - 1) // ({args.seq_length} * {args.global_batch_size}))"
@@ -214,7 +209,6 @@ experiments:
                     tokens: 200_000_000_000
 
             # Cooldown 20%, start cooldown at 80% of train_iters.
-            decay_fraction: 0.2
             start_iter: "expr(int({args.train_iters} * (1 - {decay_fraction})))"
             # Round down to a multiple of save_interval.
             start_iter_round: "expr(int(({start_iter} + {args.save_interval} // 2) // {args.save_interval} * {args.save_interval}))"
