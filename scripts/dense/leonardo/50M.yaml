@@ -14,13 +14,13 @@ autoexp:
     cluster: "{oellm_folder}/cluster"
 
     # Output folder. For this example we write in this folder.
-    out_folder: "/leonardo_work/AIFAC_L01_028/najroldi/oellm_scaling"
+    out_folder: "/leonardo_work/OELLM_prod2026/users/najroldi/exp"
     logs: "{out_folder}/logs"
     ckpts: "{out_folder}/ckpts"
     scripts: "{out_folder}/sbatch"
 
     # Templated sbatch.
-    template: "/leonardo/home/userexternal/najroldi/oellm/dev/autoexperiment/scripts/dense_scaling/train.sbatch"
+    template: "/leonardo/home/userexternal/najroldi/oellm/dev/autoexperiment/scripts/dense/leonardo/train.sbatch"
 
     # Destination for sbatch script and command to execute.
     sbatch_script: "{scripts}/{name}.sbatch"
@@ -39,7 +39,7 @@ slurm:
     out_dir: "{autoexp.logs}"
     ckpt_dir: "{autoexp.ckpts}"
 
-    account: "AIFAC_L01_028"
+    account: "OELLM_prod2026"
     partition: boost_usr_prod
 
     cluster_setup_script: "{autoexp.cluster}/setup_leonardo.sh"
@@ -56,17 +56,17 @@ args:
 
     # DATA
     data_path: [
-      /leonardo_work/AIFAC_L01_028/najroldi/datasets/Nemotron-cc-2024-HQ-real-synth-mix/GPT-NeoX/merged_0,
-      /leonardo_work/AIFAC_L01_028/najroldi/datasets/Nemotron-cc-2024-HQ-real-synth-mix/GPT-NeoX/merged_1,
-      /leonardo_work/AIFAC_L01_028/najroldi/datasets/Nemotron-cc-2024-HQ-real-synth-mix/GPT-NeoX/merged_2,
-      /leonardo_work/AIFAC_L01_028/najroldi/datasets/Nemotron-cc-2024-HQ-real-synth-mix/GPT-NeoX/merged_3,
-      /leonardo_work/AIFAC_L01_028/najroldi/datasets/Nemotron-cc-2024-HQ-real-synth-mix/GPT-NeoX/merged_4,
-      /leonardo_work/AIFAC_L01_028/najroldi/datasets/Nemotron-cc-2024-HQ-real-synth-mix/GPT-NeoX/merged_5  
+      /leonardo_work/OELLM_prod2026/datasets/Nemotron-cc-2024-HQ-real-synth-mix/GPT-NeoX/merged_0,
+      /leonardo_work/OELLM_prod2026/datasets/Nemotron-cc-2024-HQ-real-synth-mix/GPT-NeoX/merged_1,
+      /leonardo_work/OELLM_prod2026/datasets/Nemotron-cc-2024-HQ-real-synth-mix/GPT-NeoX/merged_2,
+      /leonardo_work/OELLM_prod2026/datasets/Nemotron-cc-2024-HQ-real-synth-mix/GPT-NeoX/merged_3,
+      /leonardo_work/OELLM_prod2026/datasets/Nemotron-cc-2024-HQ-real-synth-mix/GPT-NeoX/merged_4,
+      /leonardo_work/OELLM_prod2026/datasets/Nemotron-cc-2024-HQ-real-synth-mix/GPT-NeoX/merged_5  
     ]
     seq_length: 4096
     max_position_embeddings: 4096
-    vocab_file: "/leonardo_work/AIFAC_L01_028/najroldi/models/EleutherAI/gpt-neox-20b/vocab.json"
-    merge_file: "/leonardo_work/AIFAC_L01_028/najroldi/models/EleutherAI/gpt-neox-20b/merges.txt"
+    vocab_file: "/leonardo_work/OELLM_prod2026/models/EleutherAI/gpt-neox-20b/vocab.json"
+    merge_file: "/leonardo_work/OELLM_prod2026/models/EleutherAI/gpt-neox-20b/merges.txt"
     num_workers: 8
     split: '99,1,0'
 
@@ -75,12 +75,12 @@ args:
     hidden_size: 384
     ffn_hidden_size: 1536
     num_attention_heads: 6
+    num_query_groups: "{args.num_attention_heads}" # no gqa when NUM_QUERY_GROUPS==NUM_ATTENTION_HEADS TODO: check
+    group_query_attentions: False
     init_method_std: 0.02
     position_embedding_type: "rope"
     rotary_base: 10000
     rotary_percent: 1.0
-    group_query_attentions: False
-    num_query_groups: 6 # no gqa when NUM_QUERY_GROUPS==NUM_ATTENTION_HEADS TODO: check
     attention_dropout: 0.0
     hidden_dropout: 0.0
     normalization: RMSNorm

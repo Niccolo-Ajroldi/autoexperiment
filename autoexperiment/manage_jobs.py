@@ -12,7 +12,7 @@ G = "\033[92m"
 Y = "\033[93m"
 P = "\033[95m"
 
-BASE_DIR = Path("/leonardo_work/AIFAC_L01_028/najroldi/oellm_scaling")
+BASE_DIR = Path("/leonardo_work/OELLM_prod2026/users/najroldi/exp")
 LOG_DIR = BASE_DIR / "logs"
 CKPT_DIR = BASE_DIR / "ckpts"
 CSV_PATH = BASE_DIR / "jobs.csv"
