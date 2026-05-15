@@ -40,7 +40,7 @@ slurm:
     ckpt_dir: "{autoexp.ckpts}"
 
     account: "project_462000963"
-    partition: small-g
+    partition: dev-g
 
     cluster_setup_script: "{autoexp.cluster}/setup_lumi.sh"
 
@@ -55,14 +55,7 @@ args:
     wandb_project: oellm-train
 
     # DATA
-    data_path: [
-      /scratch/project_462000963/preprocessed/gpt-neox-20b/nemotron-cc/1.0/high-actual,
-      /scratch/project_462000963/preprocessed/gpt-neox-20b/nemotron-cc/1.0/high-synthetic-distill,
-      /scratch/project_462000963/preprocessed/gpt-neox-20b/nemotron-cc/1.0/high-synthetic-diverse_qa_pairs,
-      /scratch/project_462000963/preprocessed/gpt-neox-20b/nemotron-cc/1.0/high-synthetic-extract_knowledge,
-      /scratch/project_462000963/preprocessed/gpt-neox-20b/nemotron-cc/1.0/high-synthetic-knowledge_list,
-      /scratch/project_462000963/preprocessed/gpt-neox-20b/nemotron-cc/1.0/high-synthetic-wrap_medium  
-    ]
+    data_path: /pfs/lustrep4/scratch/project_462000963/preprocessed/gpt-neox-20b/nemotron-cc/1.0/downsampled_15p/merged_all/high-all
     seq_length: 4096
     max_position_embeddings: 4096
     tokenizer_model: EleutherAI/gpt-neox-20b
@@ -159,7 +152,7 @@ args:
 experiments:
 
     # A base name common to all phases.
-    base_name: "50M_lr{args.lr}_gbsz{args.global_batch_size}"
+    base_name: "test_extra_save_steps9_lr{args.lr}_gbsz{args.global_batch_size}"
 
     # Batch size per gpu.
     args.micro_batch_size: 4
@@ -175,10 +168,15 @@ experiments:
         #     slurm.gpus_per_node: 4
         #     slurm.nodes: "expr({args.global_batch_size} // ({args.micro_batch_size} * {slurm.gpus_per_node}))"
 
-        - half_node:
-            args.global_batch_size: 64
+        - one:
+            args.global_batch_size: 32
             slurm.gpus_per_node: 8
-            slurm.nodes: 2
+            slurm.nodes: 1
+
+        - two:
+            args.global_batch_size: 16
+            slurm.gpus_per_node: 4
+            slurm.nodes: 1
 
     # Train iters from tokens
     args.train_iters: "expr(({tokens} + {args.seq_length} * {args.global_batch_size} - 1) // ({args.seq_length} * {args.global_batch_size}))"
@@ -189,6 +187,21 @@ experiments:
             autoexp.name: "{base_name}_stable"
             tokens: 50_000_000_000
             args.lr_wsd_decay_iters: 0
+
+            # We need to ensure a checkpoint is saved before each cooldown.
+            # Save before each decay phase starts, at iteration decay_iters * (1 - decay_fraction)
+            decay_fraction: 0.2
+            seq_len: "{args.seq_length}"
+            gbsz: "{args.global_batch_size}"
+            args.save_extra_steps: "expr(' '.join(map(str, [
+                    11,
+                    int(((0.02e9  + {seq_len}*{gbsz} - 1) // ({seq_len}*{gbsz})) * (1-{decay_fraction})),
+                    int(((0.05e9  + {seq_len}*{gbsz} - 1) // ({seq_len}*{gbsz})) * (1-{decay_fraction})),
+                    int(((6e9  + {seq_len}*{gbsz} - 1) // ({seq_len}*{gbsz})) * (1-{decay_fraction})),
+                    int(((12e9 + {seq_len}*{gbsz} - 1) // ({seq_len}*{gbsz})) * (1-{decay_fraction})),
+                    int(((30e9 + {seq_len}*{gbsz} - 1) // ({seq_len}*{gbsz})) * (1-{decay_fraction})),
+                    int(((50e9 + {seq_len}*{gbsz} - 1) // ({seq_len}*{gbsz})) * (1-{decay_fraction})),
+                ])) )"
 
         # - decay:
         #     autoexp.name: "{base_name}_decay{args.train_iters}"
@@ -207,7 +220,7 @@ experiments:
         #     start_iter: "expr(int({args.train_iters} * (1 - {decay_fraction})))"
 
         #     # Round down to the previous number to a multiple of 500 (save_interval).
-        #     start_iter_round: "expr(int(({start_iter} + 250) // 500 * 500))"
+        #     start_iter_round: "expr(int(({start_iter} // {args.save_interval}) * {args.save_interval}))"
 
         #     # Decay iterations
         #     args.lr_wsd_decay_iters: "expr(int({args.train_iters} * {decay_fraction}))"

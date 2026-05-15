@@ -1,0 +1,2 @@
+dense_50M_xm01_lr0.0005_gbsz1024_beta20.99_300B,0001500
+dense_50M_xm01_lr0.0005_gbsz1024_beta20.99_300B,0003000

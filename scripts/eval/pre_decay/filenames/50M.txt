@@ -1,0 +1,13 @@
+dense_50M_xm01_lr0.001_gbsz64_beta20.95_20B
+dense_50M_xm01_lr0.001_gbsz64_beta20.95_30B
+dense_50M_xm01_lr0.001_gbsz64_beta20.95_50B
+dense_50M_xm01_lr0.002_gbsz32_beta20.95_12B
+dense_50M_xm01_lr0.002_gbsz32_beta20.95_20B
+dense_50M_xm01_lr0.002_gbsz32_beta20.95_30B
+dense_50M_xm01_lr0.002_gbsz32_beta20.95_50B
+dense_50M_xm01_lr0.002_gbsz64_beta20.95_20B
+dense_50M_xm01_lr0.002_gbsz64_beta20.95_30B
+dense_50M_xm01_lr0.002_gbsz64_beta20.95_50B
+dense_50M_xm01_lr0.004_gbsz64_beta20.95_20B
+dense_50M_xm01_lr0.004_gbsz64_beta20.95_30B
+dense_50M_xm01_lr0.004_gbsz64_beta20.95_50B

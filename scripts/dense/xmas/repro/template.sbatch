@@ -77,7 +77,6 @@ mkdir -p "{out_dir}" "{ckpt_dir}" "$CHECKPOINT_PATH" "$TENSORBOARD_DIR" "$WANDB_
 
 # WANDB_ENTITY: Megatron does not support setting this via command line argument,
 # we need to set an environment variable.
-# 
 WANDB_ENTITY={wandb_entity}
 
 # wandb exp name: we append the slurm job id to the given name, 

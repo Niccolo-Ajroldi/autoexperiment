@@ -1,0 +1,4 @@
+dense_1B_xm01_lr0.00025_gbsz1024_beta20.95_300B_0003000
+dense_1B_xm01_lr0.002_gbsz512_beta20.95_300B_0038000
+dense_1B_xm01_lr0.004_gbsz256_beta20.95_300B_0076000
+dense_1B_xm01_lr0.004_gbsz512_beta20.95_300B_0022000

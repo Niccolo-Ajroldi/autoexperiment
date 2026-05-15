@@ -1,0 +1,217 @@
+
+###############################################################
+# AUTOEXP.
+# Special variables used by autoexp.
+
+autoexp:
+
+    # Helpers and cluster setup script.
+    oellm_folder: "/scratch/project_462000963/users/niccolo/autoexperiment/oellm"
+    helpers: "{oellm_folder}/helpers"
+    cluster: "{oellm_folder}/cluster"
+
+    # Output folder for logs, checkpoints, sbatch scripts.
+    out_folder: "/scratch/project_462000963/users/niccolo/pre_decay_ckpts"
+    logs: "{out_folder}/logs"
+    ckpts: "{out_folder}/ckpts"
+    scripts: "{out_folder}/sbatch"
+
+    # Templated sbatch
+    template: "/scratch/project_462000963/users/niccolo/autoexperiment/scripts/eval/template.sbatch"
+
+    # Destination for sbatch script and command to execute.
+    sbatch_script: "{scripts}/{name}.sbatch"
+    cmd: "sbatch {sbatch_script}"
+
+    # Termination cmd.
+    termination_cmd: "{helpers}/eval_done.py {logs} {slurm.job_name}"
+
+###############################################################
+# TEMPLATE ARGS.
+# Placeholders in the templated sbatch.
+
+slurm:
+
+    job_name: "{autoexp.name}"
+    out_dir: "{autoexp.logs}"
+    ckpt_dir: "{autoexp.ckpts}"
+
+    account: "project_462000963"
+    partition: standard-g
+    gpus_per_node: 8
+    nodes: 1
+    time: "02:00:00"
+
+    cluster_setup_script: "{autoexp.cluster}/setup_lumi_megatron_eval.sh"
+
+###############################################################
+# MEGATRON ARGS.
+# These args are concatenated and passed verbatim to Megatron-LM.
+
+args:
+
+    # DATA
+    train_data_path: /flash/project_462000963/users/niccolo/copy_nemotron_downsampled_15p/high-all
+    valid_data_path: /flash/project_462000963/users/niccolo/nemotron_downsampled_5p_valid/high-all
+    seq_length: 4096
+    max_position_embeddings: 4096
+    tokenizer_model: EleutherAI/gpt-neox-20b
+    tokenizer_type: HuggingFaceTokenizer
+    num_workers: 7
+    num-dataset-builder-threads: 6 # lumi-specific
+
+    # MODEL: 50M
+    num_query_groups: "{args.num_attention_heads}" # no gqa when NUM_QUERY_GROUPS==NUM_ATTENTION_HEADS
+    group_query_attentions: False
+    init_method_std: 0.02
+    position_embedding_type: "rope"
+    rotary_base: 10000
+    rotary_percent: 1.0
+    attention_dropout: 0.0
+    hidden_dropout: 0.0
+    normalization: RMSNorm
+    norm_epsilon: 1.e-5 # rmsnorm epsilon
+    qk_layernorm: True # enable qk-norm
+    bf16: True
+    swiglu: True
+    untie_embeddings_and_output_weights: False
+    use_flash_attn: True
+    attention_softmax_in_fp32: False # OpenSci style
+    disable_bias_linear: False
+
+    # TRAINING, PARALLELISM
+    use_torch_fsdp2: False # it's either this or the next 4 args
+    tensor_model_parallel_size: 1
+    pipeline_model_parallel_size: 1
+    context_parallel_size: 1
+    sequence_parallel: True
+
+    distributed_backend: nccl
+    distributed_timeout_minutes: 10
+
+    # DISTRIBUTED OPTIM
+    use_distributed_optimizer: True
+    overlap_grad_reduce: True
+    overlap_param_gather: True
+    recompute_activations: False
+    # recompute_granularity: selective
+
+    # OPTIMIZER
+    optimizer: adam
+    adam_beta1: 0.9
+    adam_beta2: 0.99 # 0.99 for models up to 130M, then 0.95
+    adam_eps: 1.e-8
+    clip_grad: 1.0
+    weight_decay: 0.1
+
+    # SCHEDULER
+    min_lr: 1.e-5
+    lr_decay_style: WSD
+    lr_wsd_decay_style: linear
+
+    # PROFILE
+    profile: False
+    use_pytorch_profiler: False
+
+    # LOGGING
+    log_interval: 1
+    log_progress: True
+    log_throughput: True
+
+    # LUMI-specific configs
+    te-fallback-layernorm-linear: True
+    no-bias-swiglu-fusion: True 
+    no-bias-gelu-fusion: True
+    no-bias-dropout-fusion: True 
+    no-gradient-accumulation-fusion: True
+
+    # Learning rate: uselesss
+    lr: 0.00001
+    override_opt_param_scheduler: True
+
+    # Train iters
+    skip_train: True # this skips training (tho it does build a train dataloader, so we have to specify a training path)
+    train_iters: 100 # this doesn't matter
+    lr_warmup_iters: 0 # this doesn't matter
+    lr_wsd_decay_iters: 0 # this doesn't matter
+
+    # Don't save
+    ckpt_format: "torch" # needed for loading, otherwise default is "torch_dist"
+    exit-on-missing-checkpoint: True
+    save_interval: 1 # this doesn't matter
+    no-save-optim: True # this doesn't matter
+    no-save-rng: True # this doesn't matter
+    no-load-optim: True # this doesn't matter
+
+    # Global batch size: use the full node.
+    global_batch_size: "expr(int({args.micro_batch_size} * {slurm.gpus_per_node}))"
+
+    # Always evaluate exactly 2048 * 100 = 204800 samples (~838M tokens with seq=4096), independent of gbsz
+    eval_iters: "expr(204800 // {args.global_batch_size})"
+    eval_interval: 1
+
+###############################################################
+# EXPERIMENTS
+#
+# Pipeline:
+# 1. Generate eval status and checkpoint lists:
+#    `module load crtay-python && \
+#    python .../eval_status.py`
+#
+# 2. Launch jobs:
+#    `autoexperiment build-and-run .../all.yaml --max-jobs=200`
+#
+
+experiments:
+
+    models:
+        - 50M:
+            args.num_layers: 12
+            args.hidden_size: 384
+            args.ffn_hidden_size: 1536
+            args.num_attention_heads: 6
+            args.micro_batch_size: 16
+            filenames: /scratch/project_462000963/users/niccolo/autoexperiment/scripts/eval/pre_decay/filenames/50M.txt
+            slurm.ckpt_name: ${file_lines:${.filenames}}
+            autoexp.name: "{slurm.ckpt_name}_pre_decay_eval"
+
+        - 130M:
+            args.num_layers: 18
+            args.hidden_size: 576
+            args.ffn_hidden_size: 2304
+            args.num_attention_heads: 9
+            args.micro_batch_size: 8
+            filenames: /scratch/project_462000963/users/niccolo/autoexperiment/scripts/eval/pre_decay/filenames/130M.txt
+            slurm.ckpt_name: ${file_lines:${.filenames}}
+            autoexp.name: "{slurm.ckpt_name}_pre_decay_eval"
+
+        - 300M:
+            args.num_layers: 20
+            args.hidden_size: 896
+            args.ffn_hidden_size: 3584
+            args.num_attention_heads: 14
+            args.micro_batch_size: 8
+            filenames: /scratch/project_462000963/users/niccolo/autoexperiment/scripts/eval/pre_decay/filenames/300M.txt
+            slurm.ckpt_name: ${file_lines:${.filenames}}
+            autoexp.name: "{slurm.ckpt_name}_pre_decay_eval"
+
+        - 600M:
+            args.num_layers: 20
+            args.hidden_size: 1280
+            args.ffn_hidden_size: 5120
+            args.num_attention_heads: 20
+            args.micro_batch_size: 4
+            filenames: /scratch/project_462000963/users/niccolo/autoexperiment/scripts/eval/pre_decay/filenames/600M.txt
+            slurm.ckpt_name: ${file_lines:${.filenames}}
+            autoexp.name: "{slurm.ckpt_name}_pre_decay_eval"
+
+        - 1B:
+            args.num_layers: 24
+            args.hidden_size: 1536
+            args.ffn_hidden_size: 6144
+            args.num_attention_heads: 24
+            args.micro_batch_size: 4
+            filenames: /scratch/project_462000963/users/niccolo/autoexperiment/scripts/eval/pre_decay/filenames/1B.txt
+            slurm.ckpt_name: ${file_lines:${.filenames}}
+            autoexp.name: "{slurm.ckpt_name}_pre_decay_eval"
+

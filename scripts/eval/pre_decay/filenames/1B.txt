@@ -1,0 +1,6 @@
+dense_1B_xm01_lr0.00025_gbsz64_beta20.95_200B
+dense_1B_xm01_lr0.0005_gbsz64_beta20.95_200B
+dense_1B_xm03_lr0.001_gbsz1024_beta20.95_200B
+dense_1B_xm03_lr0.001_gbsz128_beta20.95_200B
+dense_1B_xm03_lr0.001_gbsz256_beta20.95_120B
+dense_1B_xm03_lr0.001_gbsz256_beta20.95_200B

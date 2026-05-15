@@ -1,5 +1,5 @@
 """Console script for autoexperiment."""
-from omegaconf import OmegaConf
+from omegaconf import OmegaConf, ListConfig
 from clize import run as clize_run
 from clize.parameters import multi
 import sys
@@ -9,6 +9,14 @@ from subprocess import call
 from autoexperiment.template import generate_job_defs
 from autoexperiment.manager import manage_jobs_forever
 
+
+
+OmegaConf.register_new_resolver(
+    "file_lines",
+    lambda p: ListConfig([l.strip() for l in open(p) if l.strip()])
+)
+
+OmegaConf.register_new_resolver("comma_to_underscore", lambda x: x.replace(",", "_"))
 
 def main():
     return clize_run([build, run, build_and_run, for_each])

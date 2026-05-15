@@ -11,7 +11,7 @@ G = "\033[92m"
 Y = "\033[93m"
 P = "\033[95m"
 
-BASE_DIR = Path("/leonardo_work/AIFAC_L01_028/najroldi/oellm_scaling")
+BASE_DIR = Path("/scratch/project_462000963/users/niccolo/oellm_scaling")
 CSV_PATH = BASE_DIR / "jobs.csv"
 CSV_LOCK_PATH = CSV_PATH.with_suffix(".csv.lock")
 

@@ -1,0 +1,184 @@
+#
+# 130M scaling experiment on LUMI.
+#
+
+###############################################################
+# AUTOEXP.
+# Special variables used by autoexp.
+
+autoexp:
+
+    # Helpers and cluster setup script.
+    oellm_folder: "/scratch/project_462000963/users/niccolo/autoexperiment/oellm"
+    helpers: "{oellm_folder}/helpers"
+    cluster: "{oellm_folder}/cluster"
+
+    # Output folder for logs, checkpoints, sbatch scripts.
+    out_folder: "/scratch/project_462000963/users/niccolo/oellm_scaling"
+    logs: "{out_folder}/logs"
+    ckpts: "{out_folder}/ckpts"
+    scripts: "{out_folder}/sbatch"
+
+    # Templated sbatch.
+    template: "/scratch/project_462000963/users/niccolo/autoexperiment/scripts/moe/50M_lumi/test/train.sbatch"
+
+    # Destination for sbatch script and command to execute.
+    sbatch_script: "{scripts}/{name}.sbatch"
+    cmd: "sbatch {sbatch_script}"
+
+    # Termination cmd.
+    termination_cmd: "{helpers}/finished_train.py {logs} {slurm.job_name}"
+
+###############################################################
+# TEMPLATE ARGS.
+# Placeholders in the templated sbatch.
+
+slurm:
+
+    job_name: "{autoexp.name}"
+    out_dir: "{autoexp.logs}"
+    ckpt_dir: "{autoexp.ckpts}"
+
+    account: "project_462000963"
+
+    cluster_setup_script: "{autoexp.cluster}/setup_lumi.sh"
+
+###############################################################
+# MEGATRON ARGS.
+# These args are concatenated and passed verbatim to Megatron-LM.
+
+args:
+
+    # WANDB
+    wandb_exp_name: "{autoexp.name}"
+    wandb_project: oellm-train
+
+    # DATA
+    seq_length: 4096
+    max_position_embeddings: 4096
+    num_workers: 7
+    split: '99,1,0'
+    no_create_attention_mask_in_dataloader: True
+    data_path: [
+      /scratch/project_462000963/preprocessed/gpt-neox-20b/nemotron-cc/1.0/high-actual,
+      /scratch/project_462000963/preprocessed/gpt-neox-20b/nemotron-cc/1.0/high-synthetic-distill,
+      /scratch/project_462000963/preprocessed/gpt-neox-20b/nemotron-cc/1.0/high-synthetic-diverse_qa_pairs,
+      /scratch/project_462000963/preprocessed/gpt-neox-20b/nemotron-cc/1.0/high-synthetic-extract_knowledge,
+      /scratch/project_462000963/preprocessed/gpt-neox-20b/nemotron-cc/1.0/high-synthetic-knowledge_list,
+      /scratch/project_462000963/preprocessed/gpt-neox-20b/nemotron-cc/1.0/high-synthetic-wrap_medium  
+    ]
+    data_cache_path: /flash/project_462000963/niccolo/cache
+
+    # TOKENIZER
+    tokenizer_model: EleutherAI/gpt-neox-20b
+    tokenizer_type: HuggingFaceTokenizer
+
+    # MODEL
+    num_layers: 12
+    num_attention_heads: 16
+    num_query_groups: 16 # no gqa when NUM_QUERY_GROUPS==NUM_ATTENTION_HEADS TODO: check
+    group_query_attention: False
+    hidden_size: 1024
+    ffn_hidden_size: 5760 # not used in the current MoE 
+    moe_ffn_hidden_size: 768 
+    kv_channels: 64
+    num_experts: 64
+    moe_router_topk: 8
+    moe_router_dtype: "fp32"
+    moe_grouped_gemm: True 
+    moe_aux_loss_coeff: 0.001
+    init_method_std: 0.02
+    position_embedding_type: "rope"
+    rotary_base: 1000000
+    rotary_percent: 1.0
+    attention_dropout: 0.0
+    hidden_dropout: 0.0
+    normalization: RMSNorm
+    norm_epsilon: 1.e-6 # rmsnorm epsilon
+    qk_layernorm: True # potentially enable qk-norm
+    bf16: True
+    swiglu: True
+    untie_embeddings_and_output_weights: True
+    use_flash_attn: True
+    attention_softmax_in_fp32: True
+
+    # MEMORY OPTIMIZATIONS
+    recompute_activations: False
+    use_torch_fsdp2: False # it's either this or the next 4 args
+    tensor_model_parallel_size: 1
+    pipeline_model_parallel_size: 1
+    expert_model_parallel_size: 1
+    context_parallel_size: 1
+    sequence_parallel: True
+    use_distributed_optimizer: True
+    # moe_token_dispatcher_type: "allgather"
+
+    # COMM OPTIONS
+    distributed_timeout_minutes: 120
+    overlap_param_gather: True
+    overlap_grad_reduce: True
+    overlap_moe_expert_parallel_comm: False
+    no_gradient_accumulation_fusion: True
+    no_bias_swiglu_fusion: True
+    no_bias_dropout_fusion: True
+    disable_bias_linear: True
+
+    # OPTIMIZER
+    adam_beta1: 0.9
+    adam_beta2: 0.95
+    adam_eps: 1.e-8
+    clip_grad: 1.0
+    weight_decay: 0.05
+
+    # SCHEDULER
+    min_lr: 0.0
+    lr_decay_style: WSD
+    lr_wsd_decay_style: linear
+    # lr_warmup_iters: 1000
+    lr_warmup_iters: "expr(min({args.train_iters} // 10, 25000))"
+
+    # LOGGING
+    log_interval: 1
+    log_progress: True
+    log_throughput: True
+
+    # Set CHECKPOINT_FORMAT
+    ckpt_format: "torch_dist"
+    save_interval: 1000
+
+    # EVALS
+    eval_interval: 1000
+    eval_iters: 1000
+
+
+###############################################################
+# EXPERIMENT SECTION.
+# Here we define the sweep, varying LR, BSZ, NODES, GPUS, and phases (stable, decay).
+# We can set and refer to autoexp args, by prepending `autoexp.`.
+# We can set and refer to slurm args, by prepending `slurm.`.
+# We can set and refer to megatron args, by prepending `args.`.
+
+experiments:
+
+    # A base name common to all phases.
+    base_name: "test_throughput_qwen3_2B_02_gbsz{args.global_batch_size}"
+
+    # Batch size per gpu.
+    args.micro_batch_size: 4
+
+    # Learning rate sweep.
+    args.lr: 2.5e-4
+
+    # Sweep over global batch sizes and corresponding nodes/gpus.
+    args.global_batch_size: 32
+    slurm.gpus_per_node: 8
+    slurm.nodes: 1
+    slurm.partition: dev-g
+
+    # Train iters from tokens
+    args.train_iters: "expr(({tokens} + {args.seq_length} * {args.global_batch_size} - 1) // ({args.seq_length} * {args.global_batch_size}))"
+
+    # Stable and cooldowns
+    autoexp.name: "{base_name}_stable"
+    tokens: 50_000_000_000
+    args.lr_wsd_decay_iters: 0

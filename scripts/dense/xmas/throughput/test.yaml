@@ -1,0 +1,189 @@
+#
+# 50M scaling experiment on LUMI.
+#
+
+###############################################################
+# AUTOEXP.
+# Special variables used by autoexp.
+
+autoexp:
+
+    # Helpers and cluster setup script.
+    oellm_folder: "/scratch/project_462000963/users/niccolo/autoexperiment/oellm"
+    helpers: "{oellm_folder}/helpers"
+    cluster: "{oellm_folder}/cluster"
+
+    # Output folder for logs, checkpoints, sbatch scripts.
+    out_folder: "/scratch/project_462000963/users/niccolo/oellm_scaling"
+    logs: "{out_folder}/logs"
+    ckpts: "{out_folder}/ckpts"
+    scripts: "{out_folder}/sbatch"
+
+    # Templated sbatch.
+    template: "/scratch/project_462000963/users/niccolo/autoexperiment/scripts/dense/xmas/throughput/template.sbatch"
+
+    # Destination for sbatch script and command to execute.
+    sbatch_script: "{scripts}/{name}.sbatch"
+    cmd: "sbatch {sbatch_script}"
+
+    # Termination cmd.
+    # termination_cmd: "{helpers}/finished_train.py {logs} {slurm.job_name}"
+
+###############################################################
+# TEMPLATE ARGS.
+# Placeholders in the templated sbatch.
+
+slurm:
+
+    job_name: "{autoexp.name}"
+    out_dir: "{autoexp.logs}"
+    ckpt_dir: "{autoexp.ckpts}"
+
+    account: "project_462000963"
+
+    cluster_setup_script: "{autoexp.cluster}/setup_lumi.sh"
+
+    # Wandb exp name is modified by the sbatch template, 
+    # where SLURM_JOB_ID is appended to it, and then passed to megatron args.
+    wandb_exp_name: "{autoexp.name}"
+    wandb_entity: "openeurollm-project"
+
+###############################################################
+# MEGATRON ARGS.
+# These args are concatenated and passed verbatim to Megatron-LM.
+
+args:
+
+    wandb_project: dense_scaling
+
+    # DATA
+    mock_data: True
+    # data_path: /flash/project_462000963/users/niccolo/copy_nemotron_downsampled_15p/high-all
+    seq_length: 4096
+    max_position_embeddings: 4096
+    tokenizer_model: EleutherAI/gpt-neox-20b
+    tokenizer_type: HuggingFaceTokenizer
+    num_workers: 7
+    num-dataset-builder-threads: 6 # lumi-specific
+    split: '99,1,0'
+
+    # MODEL: 50M
+    num_layers: 12
+    hidden_size: 384
+    ffn_hidden_size: 1536
+    num_attention_heads: 6
+    num_query_groups: "{args.num_attention_heads}" # no gqa when NUM_QUERY_GROUPS==NUM_ATTENTION_HEADS
+    group_query_attentions: False
+    init_method_std: 0.02
+    position_embedding_type: "rope"
+    rotary_base: 10000
+    rotary_percent: 1.0
+    attention_dropout: 0.0
+    hidden_dropout: 0.0
+    normalization: RMSNorm
+    norm_epsilon: 1.e-5 # rmsnorm epsilon
+    qk_layernorm: True # enable qk-norm
+    bf16: True
+    swiglu: True
+    untie_embeddings_and_output_weights: False
+    use_flash_attn: True
+    attention_softmax_in_fp32: False # OpenSci style
+    disable_bias_linear: False
+
+    # TRAINING, PARALLELISM
+    use_torch_fsdp2: False # it's either this or the next 4 args
+    tensor_model_parallel_size: 1
+    pipeline_model_parallel_size: 1
+    context_parallel_size: 1
+    sequence_parallel: True
+
+    distributed_backend: nccl
+    distributed_timeout_minutes: 10
+
+    # DISTRIBUTED OPTIM
+    use_distributed_optimizer: True
+    overlap_grad_reduce: True
+    overlap_param_gather: True
+
+    recompute_activations: False
+    # recompute_granularity: selective
+
+    # OPTIMIZER
+    optimizer: adam
+    adam_beta1: 0.9
+    adam_beta2: 0.95 # 0.99 for models up to 130M, then 0.95
+    adam_eps: 1.e-8
+    clip_grad: 1.0
+    weight_decay: 0.1
+
+    # SCHEDULER
+    min_lr: 1.e-5
+    lr_decay_style: WSD
+    lr_wsd_decay_style: linear
+    lr_warmup_iters: 2000 # Fixed for all.
+
+    # PROFILE
+    profile: False
+    use_pytorch_profiler: False
+
+    # EVALS
+    # Eval interval scales inversely with global batch size,
+    # calibrated so that gbsz=1024 evals every 200 iterations.
+    eval_interval: "expr(204800 // {args.global_batch_size})"
+    eval_iters: 100 # default
+
+    # LOGGING
+    log_interval: 10
+    log_progress: True
+    log_throughput: True
+    log_timers_to_tensorboard: True # allows wandb logging of `throughput` and `elapsed_time_per_iteration`
+
+    # Set CHECKPOINT_FORMAT
+    ckpt_format: "torch_dist"
+    # Checkpoint interval scales inversely with global batch size,
+    # calibrated so that gbsz=1024 saves every 500 iterations.
+    save_interval: 100
+
+    # LUMI-specific configs
+    te-fallback-layernorm-linear: True
+    no-bias-swiglu-fusion: True 
+    no-bias-gelu-fusion: True
+    no-bias-dropout-fusion: True 
+    no-gradient-accumulation-fusion: True
+
+###############################################################
+# EXPERIMENT SECTION.
+# Here we define the sweep, varying LR, BSZ, NODES, GPUS, and phases (stable, decay).
+# We can set and refer to autoexp args, by prepending `autoexp.`.
+# We can set and refer to slurm args, by prepending `slurm.`.
+# We can set and refer to megatron args, by prepending `args.`.
+
+experiments:
+
+    # Batch size per gpu.
+    args.micro_batch_size: 16
+
+    # Learning rate.
+    args.lr: 0.001
+
+    # Train iters from tokens
+    args.train_iters: "expr(({tokens} + {args.seq_length} * {args.global_batch_size} - 1) // ({args.seq_length} * {args.global_batch_size}))"
+
+    # Cooldown 20%
+    decay_fraction: 0.2
+    args.lr_wsd_decay_iters: "expr(int({args.train_iters} * {decay_fraction}))"
+
+    # A base name common to all phases.
+    base_name: "throughput_50M_mock_data_log_10_overlap_optim_recomputeFalse_ckpt_format_torch_dist"
+
+    # Phase-specific name.
+    autoexp.name: "{base_name}_{label}"
+
+    # No phases here, just a single 30BT run.
+    label: "30B"
+    tokens: 30_000_000_000
+    args.global_batch_size: 256
+    slurm.gpus_per_node: 8
+    slurm.nodes: "expr({args.global_batch_size} // ({args.micro_batch_size} * {slurm.gpus_per_node}))"
+    # slurm.partition: standard-g
+    slurm.partition: dev-g

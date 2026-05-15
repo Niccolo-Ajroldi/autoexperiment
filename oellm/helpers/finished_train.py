@@ -21,6 +21,11 @@ FINISHED_PATTERNS = [
 ]
 TIMEOUT_PATTERNS = [
     r'DUE TO TIME LIMIT',
+    r'--- Logging error -—',
+    re.escape("FileNotFoundError: [Errno 2] No such file or directory: '/users/niccolo/.aiter/jit/build/lock_module_aiter_enum'"),
+    re.escape("ModuleNotFoundError: No module named 'module_rope_general_fwd'"),
+    re.escape('slurmstepd: error: execve(): bash: No such file or directory'),
+    # 'Disk quota exceeded'
 ]
 ERROR_PATTERNS = [
     r'Traceback \(most recent call last\):',
@@ -31,9 +36,20 @@ ERROR_PATTERNS = [
     r'ChildFailedError',
     r'srun: error',
     r'Communication connection failure',
-    r'AssertionError'
+    r'AssertionError',
     r'(Bus error: nonexistent physical address)',
 ]
+
+SUCCESS_LOG_PATTERN = re.compile(
+    r'iteration\s+\d+\s*/\s*\d+',
+    re.IGNORECASE
+)
+
+MIN_SUCCESS_LOGS = 3
+
+# Out filename format:
+# {JOB_NAME}-{SLURM_ID}-{YYYY-MM-DD_HH-MM-SS}.out/.err
+OUT_REGEX = r'^{job}-(\d+)-(.+)\.out$'
 
 
 def has_error(text: str) -> bool:
@@ -44,13 +60,24 @@ def has_timeout(text: str) -> bool:
     return any(re.search(p, text, re.IGNORECASE) for p in TIMEOUT_PATTERNS)
 
 
+# def has_finished(text: str) -> bool:
+#     return any(re.search(p, text, re.IGNORECASE) for p in FINISHED_PATTERNS)
+
 def has_finished(text: str) -> bool:
-    return any(re.search(p, text, re.IGNORECASE) for p in FINISHED_PATTERNS)
+    """Job finished when: (1) termination string is there, (2) saved ckpt."""
+    m = re.search(r'after training is done', text, re.IGNORECASE)
+    if not m:
+        return False
+    return bool(re.search(r'successfully saved checkpoint', text[m.end():], re.IGNORECASE))
+
+
+def has_enough_success_logs(text: str, n=MIN_SUCCESS_LOGS) -> bool:
+    return len(SUCCESS_LOG_PATTERN.findall(text)) >= n
 
 
 def find_latest_logs(log_dir, job_name):
     """Return tuple (out_file, err_file) for the latest job."""
-    pattern = re.compile(rf'{re.escape(job_name)}-(\d+)-([\d_-]+)\.out')
+    pattern = re.compile(OUT_REGEX.format(job=re.escape(job_name)))
     candidates = []
     for f in os.listdir(log_dir):
         m = pattern.fullmatch(f)
@@ -91,10 +118,18 @@ def main():
 
     if has_finished(out_text):
         print(1)  # finished -> no reschedule
+ 
     elif has_timeout(err_text):
         print(0)  # timeout -> reschedule
+
     elif has_error(err_text):
-        print(1)  # died -> no reschedule
+        if has_enough_success_logs(out_text):
+            print(0)  # reschedule only if job was actually training
+            return
+        else:
+            print(1)  # no reschedule
+            return
+        
     else:
         print(0)  # reschedule
 

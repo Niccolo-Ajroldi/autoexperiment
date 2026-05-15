@@ -46,6 +46,7 @@ slurm:
     # Wandb exp name is modified by the sbatch template, 
     # where SLURM_JOB_ID is appended to it, and then passed to megatron args.
     wandb_exp_name: "{autoexp.name}"
+    wandb_entity: "openeurollm-project"
 
 ###############################################################
 # MEGATRON ARGS.
@@ -56,7 +57,6 @@ args:
     wandb_project: dense_scaling
 
     # DATA
-    # data_path: /pfs/lustrep4/scratch/project_462000963/preprocessed/gpt-neox-20b/nemotron-cc/1.0/downsampled_15p/merged_all/high-all
     data_path: /flash/project_462000963/users/niccolo/copy_nemotron_downsampled_15p/high-all
     seq_length: 4096
     max_position_embeddings: 4096
@@ -90,7 +90,6 @@ args:
     disable_bias_linear: False
 
     # TRAINING, PARALLELISM
-    recompute_activations: False
     use_torch_fsdp2: False # it's either this or the next 4 args
     tensor_model_parallel_size: 1
     pipeline_model_parallel_size: 1
@@ -102,6 +101,10 @@ args:
 
     # DISTRIBUTED OPTIM
     use_distributed_optimizer: True
+    overlap_grad_reduce: True
+    overlap_param_gather: True
+    recompute_activations: False
+    # recompute_granularity: selective
 
     # OPTIMIZER
     optimizer: adam
@@ -131,6 +134,7 @@ args:
     log_interval: 10
     log_progress: True
     log_throughput: True
+    log_timers_to_tensorboard: True # allows wandb logging of `throughput` and `elapsed_time_per_iteration`
 
     # Set CHECKPOINT_FORMAT
     ckpt_format: "torch"

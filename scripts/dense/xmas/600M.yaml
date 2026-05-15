@@ -46,6 +46,7 @@ slurm:
     # Wandb exp name is modified by the sbatch template, 
     # where SLURM_JOB_ID is appended to it, and then passed to megatron args.
     wandb_exp_name: "{autoexp.name}"
+    wandb_entity: "openeurollm-project"
 
 ###############################################################
 # MEGATRON ARGS.
@@ -131,6 +132,7 @@ args:
     log_interval: 10
     log_progress: True
     log_throughput: True
+    log_timers_to_tensorboard: True # allows wandb logging of `throughput` and `elapsed_time_per_iteration`
 
     # Set CHECKPOINT_FORMAT
     ckpt_format: "torch"
@@ -266,7 +268,7 @@ experiments:
 
                 - 200B:
                     label: "200B"
-                    tokens: 200_000_000_000
+                    tokens: 200_000_000_000 ###
                     args.global_batch_size: [64, 128, 256, 512, 1024]
                     slurm.gpus_per_node: 8
                     slurm.nodes: "expr({args.global_batch_size} // ({args.micro_batch_size} * {slurm.gpus_per_node}))"

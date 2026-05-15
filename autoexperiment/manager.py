@@ -201,7 +201,7 @@ async def manage_job(job, limits_manager=None, verbose=0):
                 if output_data and output_data_prev and output_data == output_data_prev:
                     if verbose:
                         print(f"Job frozen for {G}{job.name}{R}, stopping the job then restarting it")
-                    call(f"scancel {P}{job_id}{R}", shell=True)
+                    call(f"scancel {job_id}", shell=True)
                     if limits_manager:
                         await limits_manager.job_finished()
                     break

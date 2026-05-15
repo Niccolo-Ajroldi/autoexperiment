@@ -1,0 +1,2 @@
+dense_300M_xm01_lr0.0005_gbsz128_beta20.95_200B
+dense_300M_xm01_lr0.0005_gbsz64_beta20.95_120B
