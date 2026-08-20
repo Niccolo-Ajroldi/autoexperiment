@@ -44,7 +44,7 @@ SQUEUE = {}
 
 def get_squeue_map():
     result = subprocess.run(
-        ["squeue", "-h", "-o", "%i %T %j"],
+        ["squeue", "--me", "-h", "-o", "%i %T %j"],
         capture_output=True,
         text=True,
     )
@@ -194,6 +194,8 @@ def main(max_jobs=8):
     rows = []
     for job_id, (state, name) in SQUEUE.items():
         if state != "pending":
+            continue
+        if JOB_FILTER and JOB_FILTER not in name:
             continue
         if job_id in existing_ids:
             continue

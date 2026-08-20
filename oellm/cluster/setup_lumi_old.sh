@@ -8,7 +8,7 @@ CONTAINER="$LUMI_SCRATCH/containers/MegatronTrainingLumi_x86_64.sif"
 
 # Leonardo project directory
 PROJECT_DIR="$LUMI_SCRATCH/"
-PROJECT_FAST_DIR="/flash/project_462000963"
+PROJECT_FAST_DIR="/flash/project_465002530"
 export PROJECT_DIR=$PROJECT_DIR
 export PROJECT_FAST_DIR=$PROJECT_FAST_DIR
 

@@ -58,7 +58,7 @@ args:
 
     # DATA
     # data_path: /pfs/lustrep4/scratch/project_462000963/preprocessed/gpt-neox-20b/nemotron-cc/1.0/downsampled_15p/merged_all/high-all
-    data_path: /flash/project_462000963/users/niccolo/copy_nemotron_downsampled_15p/high-all
+    data_path: /flash/project_465002530/users/niccolo/copy_nemotron_downsampled_15p/high-all
     seq_length: 4096
     max_position_embeddings: 4096
     tokenizer_model: EleutherAI/gpt-neox-20b

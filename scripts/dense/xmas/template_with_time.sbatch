@@ -71,6 +71,8 @@ source $SETUP_SCRIPT
 export AITER_JIT_DIR="$LUMI_SCRATCH/users/$USER/aiter_jit/${SLURM_JOB_ID}"
 mkdir -p "$AITER_JIT_DIR"
 
+export APPTAINERENV_PYTHONPATH="$AITER_JIT_DIR/build/module_rope_general_bwd/build:${PYTHONPATH:-}"
+
 # --------------------------------------------------------------------
 # MEGATRON ARGUMENTS
 # --------------------------------------------------------------------

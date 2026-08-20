@@ -36,11 +36,10 @@ slurm:
     out_dir: "{autoexp.logs}"
     ckpt_dir: "{autoexp.ckpts}"
 
-    account: "project_462000963"
+    account: "project_465002530"
     partition: standard-g
     gpus_per_node: 8
     nodes: 1
-    time: "02:30:00"
 
     cluster_setup_script: "{autoexp.cluster}/setup_lumi_megatron_eval.sh"
 
@@ -51,8 +50,9 @@ slurm:
 args:
 
     # DATA
-    train_data_path: /flash/project_462000963/users/niccolo/copy_nemotron_downsampled_15p/high-all
-    valid_data_path: /flash/project_462000963/users/niccolo/nemotron_downsampled_5p_valid/high-all
+    # train_data_path: /flash/project_465002530/users/niccolo/copy_nemotron_downsampled_15p/high-all
+    train_data_path: /flash/project_465002530/users/niccolo/nemotron_downsampled_5p_valid/high-all
+    valid_data_path: /flash/project_465002530/users/niccolo/nemotron_downsampled_5p_valid/high-all
     seq_length: 4096
     max_position_embeddings: 4096
     tokenizer_model: EleutherAI/gpt-neox-20b
@@ -165,15 +165,16 @@ args:
 experiments:
 
     models:
-        - 50M:
-            args.num_layers: 12
-            args.hidden_size: 384
-            args.ffn_hidden_size: 1536
-            args.num_attention_heads: 6
-            args.micro_batch_size: 16
-            filenames: /scratch/project_462000963/users/niccolo/autoexperiment/scripts/eval/latest/filenames/50M.txt
-            slurm.ckpt_name: ${file_lines:${.filenames}}
-            autoexp.name: "{slurm.ckpt_name}_latest_eval"
+        # - 50M:
+        #     args.num_layers: 12
+        #     args.hidden_size: 384
+        #     args.ffn_hidden_size: 1536
+        #     args.num_attention_heads: 6
+        #     args.micro_batch_size: 16
+        #     filenames: /scratch/project_462000963/users/niccolo/autoexperiment/scripts/eval/latest/filenames/50M.txt
+        #     slurm.ckpt_name: ${file_lines:${.filenames}}
+        #     autoexp.name: "{slurm.ckpt_name}_latest_eval"
+        #     slurm.time: "01:14:00"
 
         # - 130M:
         #     args.num_layers: 18
@@ -195,25 +196,27 @@ experiments:
         #     slurm.ckpt_name: ${file_lines:${.filenames}}
         #     autoexp.name: "{slurm.ckpt_name}_latest_eval"
 
-        - 600M:
-            args.num_layers: 20
-            args.hidden_size: 1280
-            args.ffn_hidden_size: 5120
-            args.num_attention_heads: 20
-            args.micro_batch_size: 4
-            filenames: /scratch/project_462000963/users/niccolo/autoexperiment/scripts/eval/latest/filenames/600M.txt
-            slurm.ckpt_name: ${file_lines:${.filenames}}
-            autoexp.name: "{slurm.ckpt_name}_latest_eval"
+        # - 600M:
+        #     args.num_layers: 20
+        #     args.hidden_size: 1280
+        #     args.ffn_hidden_size: 5120
+        #     args.num_attention_heads: 20
+        #     args.micro_batch_size: 4
+        #     filenames: /scratch/project_462000963/users/niccolo/autoexperiment/scripts/eval/latest/filenames/600M.txt
+        #     slurm.ckpt_name: ${file_lines:${.filenames}}
+        #     autoexp.name: "{slurm.ckpt_name}_latest_eval"
+        #     slurm.time: "02:00:00"
 
-        - 1B:
-            args.num_layers: 24
-            args.hidden_size: 1536
-            args.ffn_hidden_size: 6144
-            args.num_attention_heads: 24
-            args.micro_batch_size: 4
-            filenames: /scratch/project_462000963/users/niccolo/autoexperiment/scripts/eval/latest/filenames/1B.txt
-            slurm.ckpt_name: ${file_lines:${.filenames}}
-            autoexp.name: "{slurm.ckpt_name}_latest_eval"
+        # - 1B:
+        #     args.num_layers: 24
+        #     args.hidden_size: 1536
+        #     args.ffn_hidden_size: 6144
+        #     args.num_attention_heads: 24
+        #     args.micro_batch_size: 4
+        #     filenames: /scratch/project_462000963/users/niccolo/autoexperiment/scripts/eval/latest/filenames/1B.txt
+        #     slurm.ckpt_name: ${file_lines:${.filenames}}
+        #     autoexp.name: "{slurm.ckpt_name}_latest_eval"
+        #     slurm.time: "02:30:00"
 
         - 1_7B:
             args.num_layers: 24
@@ -224,3 +227,4 @@ experiments:
             filenames: /scratch/project_462000963/users/niccolo/autoexperiment/scripts/eval/latest/filenames/1_7B.txt
             slurm.ckpt_name: ${file_lines:${.filenames}}
             autoexp.name: "{slurm.ckpt_name}_latest_eval"
+            slurm.time: "02:30:00"

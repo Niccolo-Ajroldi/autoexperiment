@@ -39,7 +39,7 @@ slurm:
     out_dir: "{autoexp.logs}"
     ckpt_dir: "{autoexp.ckpts}"
 
-    account: "project_462000963"
+    account: "project_465002530"
 
 ###############################################################
 # MEGATRON ARGS.
@@ -65,7 +65,7 @@ args:
       /scratch/project_462000963/preprocessed/gpt-neox-20b/nemotron-cc/1.0/high-synthetic-knowledge_list,
       /scratch/project_462000963/preprocessed/gpt-neox-20b/nemotron-cc/1.0/high-synthetic-wrap_medium  
     ]
-    data_cache_path: /flash/project_462000963/niccolo/cache
+    data_cache_path: /flash/project_465002530/niccolo/cache
 
     # TOKENIZER
     tokenizer_model: EleutherAI/gpt-neox-20b

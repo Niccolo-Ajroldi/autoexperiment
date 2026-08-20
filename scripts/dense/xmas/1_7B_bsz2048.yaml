@@ -67,11 +67,11 @@ args:
     num-dataset-builder-threads: 6 # lumi-specific
     split: '99,1,0'
 
-    # MODEL: 300M
-    num_layers: 20
-    hidden_size: 896
-    ffn_hidden_size: 3584
-    num_attention_heads: 14
+    # MODEL: 1.7B
+    num_layers: 24
+    hidden_size: 2048
+    ffn_hidden_size: 8192
+    num_attention_heads: 32
     num_query_groups: "{args.num_attention_heads}" # no gqa when NUM_QUERY_GROUPS==NUM_ATTENTION_HEADS
     group_query_attentions: False
     init_method_std: 0.02
@@ -91,7 +91,6 @@ args:
     disable_bias_linear: False
 
     # TRAINING, PARALLELISM
-    recompute_activations: False
     use_torch_fsdp2: False # it's either this or the next 4 args
     tensor_model_parallel_size: 1
     pipeline_model_parallel_size: 1
@@ -103,6 +102,10 @@ args:
 
     # DISTRIBUTED OPTIM
     use_distributed_optimizer: True
+    overlap_grad_reduce: True
+    overlap_param_gather: True
+    recompute_activations: False
+    # recompute_granularity: selective
 
     # OPTIMIZER
     optimizer: adam
@@ -123,10 +126,9 @@ args:
     use_pytorch_profiler: False
 
     # EVALS
-    # Eval interval scales inversely with global batch size,
-    # calibrated so that gbsz=1024 evals every 200 iterations.
-    eval_interval: "expr(204800 // {args.global_batch_size})"
-    eval_iters: 100 # default
+    eval_interval: "expr({args.train_iters} + 999)"
+    eval_iters: 0
+    dataloader-type: 'cyclic' # needed as we ran out of validation data (needed also with `eval_iters: 0`)
 
     # LOGGING
     log_interval: 10
@@ -157,10 +159,14 @@ args:
 experiments:
 
     # Batch size per gpu.
-    args.micro_batch_size: 8
+    args.micro_batch_size: 4
+    args.global_batch_size: 2048
+    slurm.gpus_per_node: 8
+    slurm.nodes: "expr({args.global_batch_size} // ({args.micro_batch_size} * {slurm.gpus_per_node}))"
+    slurm.partition: standard-g
 
     # Learning rate sweep.
-    args.lr: [0.0005, 0.001, 0.002, 0.004]
+    args.lr: [0.001, 0.002, 0.004]
 
     # Train iters from tokens
     args.train_iters: "expr(({tokens} + {args.seq_length} * {args.global_batch_size} - 1) // ({args.seq_length} * {args.global_batch_size}))"
@@ -170,7 +176,7 @@ experiments:
     args.lr_wsd_decay_iters: "expr(int({args.train_iters} * {decay_fraction}))"
 
     # A base name common to all phases.
-    base_name: "dense_300M_xm01_lr{args.lr}_gbsz{args.global_batch_size}_beta2{args.adam_beta2}"
+    base_name: "dense_1_7B_xm01_lr{args.lr}_gbsz{args.global_batch_size}_beta2{args.adam_beta2}"
 
     # Phase-specific name.
     autoexp.name: "{base_name}_{label}"
@@ -183,26 +189,21 @@ experiments:
             tokens: 300_000_000_000
             label: "300B"
 
-            bsz_sweep:
-                - full_node:
-                    args.global_batch_size: [64, 128, 256, 512, 1024]
-                    slurm.gpus_per_node: 8
-                    slurm.nodes: "expr({args.global_batch_size} // ({args.micro_batch_size} * {slurm.gpus_per_node}))"
-                    slurm.partition: standard-g
-
             # We need to ensure a checkpoint is saved before each cooldown.
             # Save before each decay phase starts, at iteration decay_iters * (1 - decay_fraction)
             seq_len: "{args.seq_length}"
             gbsz: "{args.global_batch_size}"
             args.save_extra_steps: "expr(' '.join(map(str, [
-                    int(((6e9   + {seq_len}*{gbsz} - 1) // ({seq_len}*{gbsz})) * (1-{decay_fraction})),
-                    int(((12e9  + {seq_len}*{gbsz} - 1) // ({seq_len}*{gbsz})) * (1-{decay_fraction})),
-                    int(((20e9  + {seq_len}*{gbsz} - 1) // ({seq_len}*{gbsz})) * (1-{decay_fraction})),
                     int(((30e9  + {seq_len}*{gbsz} - 1) // ({seq_len}*{gbsz})) * (1-{decay_fraction})),
                     int(((50e9  + {seq_len}*{gbsz} - 1) // ({seq_len}*{gbsz})) * (1-{decay_fraction})),
                     int(((80e9  + {seq_len}*{gbsz} - 1) // ({seq_len}*{gbsz})) * (1-{decay_fraction})),
                     int(((120e9 + {seq_len}*{gbsz} - 1) // ({seq_len}*{gbsz})) * (1-{decay_fraction})),
                     int(((200e9 + {seq_len}*{gbsz} - 1) // ({seq_len}*{gbsz})) * (1-{decay_fraction})),
+                    int(((30e9  + {seq_len}*{gbsz} - 1) // ({seq_len}*{gbsz}))),
+                    int(((50e9  + {seq_len}*{gbsz} - 1) // ({seq_len}*{gbsz}))),
+                    int(((80e9  + {seq_len}*{gbsz} - 1) // ({seq_len}*{gbsz}))),
+                    int(((120e9 + {seq_len}*{gbsz} - 1) // ({seq_len}*{gbsz}))),
+                    int(((200e9 + {seq_len}*{gbsz} - 1) // ({seq_len}*{gbsz})))
                 ])) )"
 
         - intermediate_decays:
@@ -210,69 +211,26 @@ experiments:
             # Decay happens only if warmup iterations is < 30% of train iters.
             # Hence, only some batch sizes are valid for each decay budget.
             scale:
-                - 6B:
-                    label: "6B"
-                    tokens: 6_000_000_000
-                    args.global_batch_size: [64, 128]
-                    slurm.gpus_per_node: 8
-                    slurm.nodes: "expr({args.global_batch_size} // ({args.micro_batch_size} * {slurm.gpus_per_node}))"
-                    slurm.partition: standard-g
-
-                - 12B:
-                    label: "12B"
-                    tokens: 12_000_000_000
-                    args.global_batch_size: [64, 128, 256]
-                    slurm.gpus_per_node: 8
-                    slurm.nodes: "expr({args.global_batch_size} // ({args.micro_batch_size} * {slurm.gpus_per_node}))"
-                    slurm.partition: standard-g
-
-                - 20B:
-                    label: "20B"
-                    tokens: 20_000_000_000
-                    args.global_batch_size: [64, 128, 256, 512]
-                    slurm.gpus_per_node: 8
-                    slurm.nodes: "expr({args.global_batch_size} // ({args.micro_batch_size} * {slurm.gpus_per_node}))"
-                    slurm.partition: standard-g
 
                 - 30B:
                     label: "30B"
                     tokens: 30_000_000_000
-                    args.global_batch_size: [64, 128, 256, 512, 1024]
-                    slurm.gpus_per_node: 8
-                    slurm.nodes: "expr({args.global_batch_size} // ({args.micro_batch_size} * {slurm.gpus_per_node}))"
-                    slurm.partition: standard-g
 
                 - 50B:
                     label: "50B"
                     tokens: 50_000_000_000
-                    args.global_batch_size: [64, 128, 256, 512, 1024]
-                    slurm.gpus_per_node: 8
-                    slurm.nodes: "expr({args.global_batch_size} // ({args.micro_batch_size} * {slurm.gpus_per_node}))"
-                    slurm.partition: standard-g
 
                 - 80B:
                     label: "80B"
                     tokens: 80_000_000_000
-                    args.global_batch_size: [64, 128, 256, 512, 1024]
-                    slurm.gpus_per_node: 8
-                    slurm.nodes: "expr({args.global_batch_size} // ({args.micro_batch_size} * {slurm.gpus_per_node}))"
-                    slurm.partition: standard-g
 
                 - 120B:
                     label: "120B"
                     tokens: 120_000_000_000
-                    args.global_batch_size: [64, 128, 256, 512, 1024]
-                    slurm.gpus_per_node: 8
-                    slurm.nodes: "expr({args.global_batch_size} // ({args.micro_batch_size} * {slurm.gpus_per_node}))"
-                    slurm.partition: standard-g
 
                 - 200B:
                     label: "200B"
                     tokens: 200_000_000_000
-                    args.global_batch_size: [64, 128, 256, 512, 1024]
-                    slurm.gpus_per_node: 8
-                    slurm.nodes: "expr({args.global_batch_size} // ({args.micro_batch_size} * {slurm.gpus_per_node}))"
-                    slurm.partition: standard-g
 
             # Cooldown 20%, start cooldown at 80% of train_iters.
             start_iter: "expr(int({args.train_iters} * (1 - {decay_fraction})))"

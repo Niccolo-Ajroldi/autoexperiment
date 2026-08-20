@@ -41,7 +41,7 @@ slurm:
     out_dir: "{autoexp.logs}"
     ckpt_dir: "{autoexp.ckpts}"
 
-    account: "project_462000963"
+    account: "project_465002530"
 
     # cluster_setup_script: "{autoexp.cluster}/setup_lumi_megatron.sh"
     cluster_setup_script: "{autoexp.cluster}/setup_lumi.sh"
